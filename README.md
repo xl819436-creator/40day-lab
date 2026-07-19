@@ -180,3 +180,57 @@ python cost_calculator.py
 git status
 ```
 
+---
+
+## Day 3：模拟响应统计与Git提交练习
+
+### 学习目标
+
+Day 3主要练习：
+
+1. 使用列表和字典创建模拟接口响应。
+2. 遍历响应并统计不同状态的数量。
+3. 计算接口请求成功率。
+4. 收集失败请求的ID。
+5. 校验分类数量之和是否等于响应总数。
+6. 使用Git进行小步提交。
+7. 将本地Commit推送到GitHub。
+
+### 响应状态
+
+程序只允许以下4种状态：
+
+| 状态 | 含义 |
+|---|---|
+| `success` | 请求成功 |
+| `timeout` | 请求超时 |
+| `429` | 请求频率过高，被接口限流 |
+| `500` | 服务端内部错误 |
+
+### 运行统计程序
+
+```bash
+python day03/mock_response_stats.py
+```
+
+### 运行自动测试
+
+```bash
+python day03/test_mock_response_stats.py
+```
+
+### 预期统计结果
+
+```text
+响应总数：10
+success数量：5
+timeout数量：2
+429数量：2
+500数量：1
+分类数量之和：10
+成功率：50.00%
+失败数量：5
+失败ID：request_003, request_005, request_007, request_008, request_010
+响应数据校验：通过
+分类数量校验：通过
+```
