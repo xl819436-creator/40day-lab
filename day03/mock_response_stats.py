@@ -29,15 +29,60 @@ def create_mock_responses():
     return responses
 
 
+def validate_responses(responses):
+    """
+    校验模拟响应数据。
+
+    检查：
+    1. 是否正好有10条响应
+    2. 每条数据是否为字典
+    3. 是否包含id和status
+    4. ID是否唯一
+    5. 状态是否合法
+    """
+    if len(responses) != 10:
+        raise ValueError(
+            f"响应数量错误：应该有10条，实际有{len(responses)}条。"
+        )
+
+    response_ids = []
+
+    for index, response in enumerate(responses, start=1):
+        if not isinstance(response, dict):
+            raise TypeError(
+                f"第{index}条响应不是字典。"
+            )
+
+        if "id" not in response:
+            raise ValueError(
+                f"第{index}条响应缺少id字段。"
+            )
+
+        if "status" not in response:
+            raise ValueError(
+                f"第{index}条响应缺少status字段。"
+            )
+
+        response_id = response["id"]
+        response_status = response["status"]
+
+        if response_status not in ALLOWED_STATUSES:
+            raise ValueError(
+                f"响应{response_id}存在非法状态："
+                f"{response_status}"
+            )
+
+        response_ids.append(response_id)
+
+    if len(response_ids) != len(set(response_ids)):
+        raise ValueError("响应ID存在重复。")
+
+    return True
+
+
 def calculate_statistics(responses):
     """
     遍历所有响应并完成统计。
-
-    返回：
-    1. 响应总数
-    2. 每种状态的数量
-    3. 成功率
-    4. 失败响应ID
     """
     status_counts = {
         "success": 0,
@@ -76,12 +121,31 @@ def calculate_statistics(responses):
     return statistics
 
 
+def validate_statistics(statistics):
+    """
+    校验分类数量之和是否等于响应总数。
+    """
+    status_counts = statistics["status_counts"]
+    category_total = sum(status_counts.values())
+    response_total = statistics["total"]
+
+    if category_total != response_total:
+        raise ValueError(
+            "分类数量校验失败："
+            f"分类数量之和为{category_total}，"
+            f"响应总数为{response_total}。"
+        )
+
+    return True
+
+
 def print_report(statistics):
     """
     打印响应统计报告。
     """
     status_counts = statistics["status_counts"]
     failure_ids = statistics["failure_ids"]
+    category_total = sum(status_counts.values())
 
     print("=" * 55)
     print("模拟响应统计报告")
@@ -91,6 +155,7 @@ def print_report(statistics):
     print(f"timeout数量：{status_counts['timeout']}")
     print(f"429数量：{status_counts['429']}")
     print(f"500数量：{status_counts['500']}")
+    print(f"分类数量之和：{category_total}")
     print(f"成功率：{statistics['success_rate']:.2f}%")
     print(f"失败数量：{len(failure_ids)}")
 
@@ -99,12 +164,20 @@ def print_report(statistics):
     else:
         print("失败ID：无")
 
+    print("响应数据校验：通过")
+    print("分类数量校验：通过")
     print("=" * 55)
 
 
 def main():
     responses = create_mock_responses()
+
+    validate_responses(responses)
+
     statistics = calculate_statistics(responses)
+
+    validate_statistics(statistics)
+
     print_report(statistics)
 
 
