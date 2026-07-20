@@ -1,70 +1,87 @@
 from mock_response_stats import (
     calculate_statistics,
     create_mock_responses,
-    validate_responses,
+    validate_response_structure,
     validate_statistics
 )
 
 
-def test_normal_responses():
+def test_normal_and_unknown_responses():
     """
-    测试10条正常响应的统计结果。
+    测试四种已知状态和一个未知状态。
     """
     responses = create_mock_responses()
 
-    validate_responses(responses)
+    validate_response_structure(responses)
 
     statistics = calculate_statistics(responses)
 
     validate_statistics(statistics)
 
-    expected_failure_ids = [
-        "request_003",
-        "request_005",
-        "request_007",
-        "request_008",
-        "request_010"
+    status_counts = statistics["status_counts"]
+
+    assert statistics["total"] == 11
+    assert status_counts["success"] == 5
+    assert status_counts["timeout"] == 2
+    assert status_counts["429"] == 2
+    assert status_counts["500"] == 1
+    assert status_counts["unknown"] == 1
+
+    assert abs(
+        statistics["success_rate"] - 45.454545
+    ) < 0.000001
+
+    assert statistics["unknown_responses"] == [
+        {
+            "id": "request_011",
+            "original_status": "bad_status"
+        }
     ]
 
-    assert statistics["total"] == 10
-    assert statistics["status_counts"]["success"] == 5
-    assert statistics["status_counts"]["timeout"] == 2
-    assert statistics["status_counts"]["429"] == 2
-    assert statistics["status_counts"]["500"] == 1
-    assert statistics["success_rate"] == 50.0
-    assert statistics["failure_ids"] == expected_failure_ids
+    assert "request_011" in statistics["failure_ids"]
 
-    print("正常响应统计测试：通过")
+    print("四类状态统计测试：通过")
+    print("未知状态归类测试：通过")
 
 
-def test_invalid_status():
+def test_empty_responses():
     """
-    测试程序能否识别非法状态。
+    测试空列表不会产生除以0错误。
     """
-    responses = create_mock_responses()
+    responses = []
 
-    responses[0]["status"] = "unknown"
+    validate_response_structure(responses)
 
-    try:
-        validate_responses(responses)
-    except ValueError as error:
-        print(f"非法状态测试：通过，成功捕获错误：{error}")
-    else:
-        raise AssertionError(
-            "非法状态测试失败：程序没有识别出unknown状态。"
-        )
+    statistics = calculate_statistics(responses)
+
+    validate_statistics(statistics)
+
+    status_counts = statistics["status_counts"]
+
+    assert statistics["total"] == 0
+    assert status_counts["success"] == 0
+    assert status_counts["timeout"] == 0
+    assert status_counts["429"] == 0
+    assert status_counts["500"] == 0
+    assert status_counts["unknown"] == 0
+    assert statistics["success_rate"] == 0.0
+    assert statistics["failure_ids"] == []
+    assert statistics["unknown_responses"] == []
+
+    print("空列表测试：通过")
+    print("成功率除以0防护测试：通过")
 
 
 def main():
     print("=" * 60)
-    print("开始运行Day 3自动测试")
+    print("开始运行响应统计自动测试")
     print("=" * 60)
 
-    test_normal_responses()
-    test_invalid_status()
+    test_normal_and_unknown_responses()
+    test_empty_responses()
 
     print("=" * 60)
-    print("恭喜：Day 3全部测试通过！")
+    print("恭喜：全部自动测试通过！")
     print("=" * 60)
 
 
