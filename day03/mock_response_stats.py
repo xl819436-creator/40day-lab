@@ -1,17 +1,29 @@
-# 四种允许出现的响应状态
-STATUS_ORDER = (
+# 程序能够明确识别的四种状态
+KNOWN_STATUS_ORDER = (
     "success",
     "timeout",
     "429",
     "500"
 )
 
-ALLOWED_STATUSES = set(STATUS_ORDER)
+KNOWN_STATUSES = set(KNOWN_STATUS_ORDER)
+
+# 最终统计时包含unknown分类
+CATEGORY_ORDER = (
+    "success",
+    "timeout",
+    "429",
+    "500",
+    "unknown"
+)
 
 
 def create_mock_responses():
     """
-    创建10条模拟接口响应。
+    创建模拟接口响应。
+
+    前10条为正常的四类状态，
+    第11条故意使用未知状态bad_status。
     """
     responses = [
         {"id": "request_001", "status": "success"},
@@ -23,34 +35,30 @@ def create_mock_responses():
         {"id": "request_007", "status": "500"},
         {"id": "request_008", "status": "timeout"},
         {"id": "request_009", "status": "success"},
-        {"id": "request_010", "status": "429"}
+        {"id": "request_010", "status": "429"},
+        {"id": "request_011", "status": "bad_status"}
     ]
 
     return responses
 
 
-def validate_responses(responses):
+def validate_response_structure(responses):
     """
-    校验模拟响应数据。
+    校验响应的基本结构。
 
-    检查：
-    1. 是否正好有10条响应
-    2. 每条数据是否为字典
-    3. 是否包含id和status
-    4. ID是否唯一
-    5. 状态是否合法
+    注意：
+    本函数只检查数据结构，不拒绝未知状态。
+    未知状态会在统计时归入unknown。
     """
-    if len(responses) != 10:
-        raise ValueError(
-            f"响应数量错误：应该有10条，实际有{len(responses)}条。"
-        )
+    if not isinstance(responses, list):
+        raise TypeError("响应数据必须是列表。")
 
     response_ids = []
 
     for index, response in enumerate(responses, start=1):
         if not isinstance(response, dict):
             raise TypeError(
-                f"第{index}条响应不是字典。"
+                f"第{index}条响应必须是字典。"
             )
 
         if "id" not in response:
@@ -64,12 +72,15 @@ def validate_responses(responses):
             )
 
         response_id = response["id"]
-        response_status = response["status"]
 
-        if response_status not in ALLOWED_STATUSES:
+        if not isinstance(response_id, str):
+            raise TypeError(
+                f"第{index}条响应的id必须是字符串。"
+            )
+
+        if response_id.strip() == "":
             raise ValueError(
-                f"响应{response_id}存在非法状态："
-                f"{response_status}"
+                f"第{index}条响应的id不能为空。"
             )
 
         response_ids.append(response_id)
@@ -80,26 +91,52 @@ def validate_responses(responses):
     return True
 
 
+def classify_status(status):
+    """
+    对响应状态进行分类。
+
+    已知状态保持不变；
+    其他状态全部归入unknown。
+    """
+    if status in KNOWN_STATUSES:
+        return status
+
+    return "unknown"
+
+
 def calculate_statistics(responses):
     """
-    遍历所有响应并完成统计。
+    遍历响应并完成统计。
+
+    支持：
+    1. 四种已知状态
+    2. 未知状态归入unknown
+    3. 空列表成功率为0.0
     """
     status_counts = {
-        "success": 0,
-        "timeout": 0,
-        "429": 0,
-        "500": 0
+        category: 0
+        for category in CATEGORY_ORDER
     }
 
     failure_ids = []
+    unknown_responses = []
 
     for response in responses:
-        response_status = response["status"]
+        original_status = response["status"]
+        category = classify_status(original_status)
 
-        status_counts[response_status] += 1
+        status_counts[category] += 1
 
-        if response_status != "success":
+        if category != "success":
             failure_ids.append(response["id"])
+
+        if category == "unknown":
+            unknown_responses.append(
+                {
+                    "id": response["id"],
+                    "original_status": original_status
+                }
+            )
 
     total_responses = len(responses)
     success_count = status_counts["success"]
@@ -115,7 +152,8 @@ def calculate_statistics(responses):
         "total": total_responses,
         "status_counts": status_counts,
         "success_rate": success_rate,
-        "failure_ids": failure_ids
+        "failure_ids": failure_ids,
+        "unknown_responses": unknown_responses
     }
 
     return statistics
@@ -123,10 +161,12 @@ def calculate_statistics(responses):
 
 def validate_statistics(statistics):
     """
-    校验分类数量之和是否等于响应总数。
+    校验所有分类数量之和是否等于总数。
     """
-    status_counts = statistics["status_counts"]
-    category_total = sum(status_counts.values())
+    category_total = sum(
+        statistics["status_counts"].values()
+    )
+
     response_total = statistics["total"]
 
     if category_total != response_total:
@@ -139,22 +179,25 @@ def validate_statistics(statistics):
     return True
 
 
-def print_report(statistics):
+def print_report(statistics, report_title):
     """
-    打印响应统计报告。
+    输出统计报告。
     """
     status_counts = statistics["status_counts"]
     failure_ids = statistics["failure_ids"]
+    unknown_responses = statistics["unknown_responses"]
+
     category_total = sum(status_counts.values())
 
-    print("=" * 55)
-    print("模拟响应统计报告")
-    print("=" * 55)
+    print("=" * 60)
+    print(report_title)
+    print("=" * 60)
     print(f"响应总数：{statistics['total']}")
     print(f"success数量：{status_counts['success']}")
     print(f"timeout数量：{status_counts['timeout']}")
     print(f"429数量：{status_counts['429']}")
     print(f"500数量：{status_counts['500']}")
+    print(f"unknown数量：{status_counts['unknown']}")
     print(f"分类数量之和：{category_total}")
     print(f"成功率：{statistics['success_rate']:.2f}%")
     print(f"失败数量：{len(failure_ids)}")
@@ -164,21 +207,53 @@ def print_report(statistics):
     else:
         print("失败ID：无")
 
-    print("响应数据校验：通过")
+    if unknown_responses:
+        print("未知状态详情：")
+
+        for response in unknown_responses:
+            print(
+                f"  ID={response['id']}，"
+                f"原始状态={response['original_status']}"
+            )
+    else:
+        print("未知状态详情：无")
+
     print("分类数量校验：通过")
-    print("=" * 55)
+    print("=" * 60)
 
 
 def main():
+    # 实战1：包含bad_status的模拟响应
     responses = create_mock_responses()
 
-    validate_responses(responses)
+    validate_response_structure(responses)
 
     statistics = calculate_statistics(responses)
 
     validate_statistics(statistics)
 
-    print_report(statistics)
+    print_report(
+        statistics,
+        "包含未知状态的模拟响应统计报告"
+    )
+
+    print()
+
+    # 实战2：空列表统计
+    empty_responses = []
+
+    validate_response_structure(empty_responses)
+
+    empty_statistics = calculate_statistics(
+        empty_responses
+    )
+
+    validate_statistics(empty_statistics)
+
+    print_report(
+        empty_statistics,
+        "空列表统计报告"
+    )
 
 
 if __name__ == "__main__":
