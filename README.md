@@ -299,3 +299,13 @@ python day03/mock_response_stats.py
 ```bash
 python day03/test_mock_response_stats.py
 ```
+
+## Day4
+
+### 为什么使用分支？
+
+开发新功能时使用独立分支，可以把未完成或可能存在错误的代码与稳定的main分支隔离。
+开发者可以在feature分支中反复修改和测试，测试通过后再合并到main.
+如果开发失败，也可以直接放弃该分支，不会破坏main.
+分支还可以让提交记录更加清晰，方便查看代码变化和团队协作。
+
