@@ -354,3 +354,104 @@ Day 4 使用 `list[dict]` 保存了 12 条评测样本。
 
 ```bash
 python -m day04.dataset_utils
+
+---
+
+---
+
+## Day05：Exact Match 精确匹配评分器
+
+### 学习目标
+
+实现 EvalHub 的第一个自动评分器，用于判断大模型的实际回答是否与测试集中的标准答案一致。
+
+### 完成内容
+
+* 实现 `normalize_text()` 文本标准化函数
+* 实现 `exact_match()` 精确匹配函数
+* 支持英文大小写标准化
+* 支持去除首尾空格和合并连续空白字符
+* 支持去除中英文标点
+* 支持 `strict=True` 严格匹配模式
+* 正确处理 `None` 和空字符串
+* 使用 `pytest` 编写自动化测试
+* 同时运行 Day04 和 Day05 测试，完成回归验证
+* 使用 Issue、功能分支和 Pull Request 完成功能开发
+
+### 项目文件
+
+```text
+day05/
+├── __init__.py
+├── exact_match.py
+└── test_exact_match.py
+```
+
+### 核心功能
+
+普通模式会先对文本进行标准化：
+
+```python
+from day05.exact_match import exact_match
+
+result = exact_match(
+    actual=" 北京。 ",
+    expected="北京",
+)
+
+print(result)
+```
+
+输出：
+
+```text
+True
+```
+
+严格模式直接比较原始字符串：
+
+```python
+result = exact_match(
+    actual=" 北京。 ",
+    expected="北京",
+    strict=True,
+)
+
+print(result)
+```
+
+输出：
+
+```text
+False
+```
+
+### 测试命令
+
+只测试 Day05：
+
+```bash
+python -m pytest day05/test_exact_match.py -v
+```
+
+同时测试 Day04 和 Day05：
+
+```bash
+python -m pytest day04 day05 -v
+```
+
+### Day04 与 Day05 的关系
+
+```text
+Day04读取JSONL测试数据
+        ↓
+获得问题和标准答案
+        ↓
+模型生成实际回答
+        ↓
+Day05进行Exact Match评分
+        ↓
+得到匹配结果True或False
+```
+
+Day04 负责准备评测数据，Day05 负责判断模型回答是否正确。两个模块组合后，EvalHub 已经具备“读取测试数据并自动评分”的基础能力。
