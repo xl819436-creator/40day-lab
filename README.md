@@ -455,3 +455,183 @@ Day05进行Exact Match评分
 ```
 
 Day04 负责准备评测数据，Day05 负责判断模型回答是否正确。两个模块组合后，EvalHub 已经具备“读取测试数据并自动评分”的基础能力。
+
+---
+
+## Day05：Exact Match 精确匹配评分器
+
+### 今日目标
+
+实现 EvalHub 的第一个自动评分器，用于判断大模型的实际回答是否与测试集中的标准答案一致。
+
+### 完成内容
+
+* 创建 `day05` Python 包
+* 实现 `normalize_text()` 文本标准化函数
+* 实现 `exact_match()` 精确匹配评分函数
+* 支持忽略英文大小写
+* 支持去除字符串首尾空格
+* 支持合并连续空格、换行符和制表符
+* 支持去除中英文标点
+* 支持 `strict=True` 严格匹配模式
+* 支持处理空字符串和 `None`
+* 对错误的数据类型抛出 `TypeError`
+* 使用 `pytest` 编写参数化自动化测试
+* 同时运行 Day04 和 Day05 测试，完成回归验证
+* 通过 Issue、功能分支和 Pull Request 完成功能开发
+
+### 项目结构
+
+```text
+day05/
+├── __init__.py
+├── exact_match.py
+└── test_exact_match.py
+```
+
+### 核心函数
+
+#### 1. `normalize_text()`
+
+`normalize_text()` 用于在比较答案之前统一文本格式，避免因为大小写、空格或标点不同而导致评分错误。
+
+```python
+from day05.exact_match import normalize_text
+
+result = normalize_text(" 北京。 ")
+print(result)
+```
+
+运行结果：
+
+```text
+北京
+```
+
+它可以完成以下处理：
+
+* 将英文转换为小写
+* 去除首尾空格
+* 合并连续空白字符
+* 去除中英文标点
+* 保留对 `None` 的支持
+
+#### 2. `exact_match()`
+
+`exact_match()` 用于比较模型实际回答与测试集标准答案。
+
+普通模式会先对文本进行标准化：
+
+```python
+from day05.exact_match import exact_match
+
+result = exact_match(
+    actual=" 北京。 ",
+    expected="北京",
+)
+
+print(result)
+```
+
+运行结果：
+
+```text
+True
+```
+
+严格模式会直接比较两个原始字符串：
+
+```python
+result = exact_match(
+    actual=" 北京。 ",
+    expected="北京",
+    strict=True,
+)
+
+print(result)
+```
+
+运行结果：
+
+```text
+False
+```
+
+### 普通模式与严格模式的区别
+
+| 模式   | 是否标准化文本 | 适用场景            |
+| ---- | ------- | --------------- |
+| 普通模式 | 是       | 只关注回答内容是否一致     |
+| 严格模式 | 否       | 对大小写、空格和标点有严格要求 |
+
+### 测试内容
+
+Day05 的自动化测试覆盖了以下情况：
+
+* 英文大小写不同
+* 字符串首尾存在空格
+* 字符串中存在连续空格
+* 包含换行符和制表符
+* 包含中文标点
+* 包含英文标点
+* 空字符串
+* `None`
+* 普通匹配模式
+* 严格匹配模式
+* 非法数据类型
+* 不使用文本标准化函数
+
+### 测试命令
+
+只运行 Day05 测试：
+
+```bash
+python -m pytest day05/test_exact_match.py -v
+```
+
+同时运行 Day04 和 Day05 测试：
+
+```bash
+python -m pytest day04 day05 -v
+```
+
+本次 Day04 和 Day05 回归测试结果：
+
+```text
+43 passed
+```
+
+### Day04 与 Day05 的关系
+
+```text
+Day04读取JSONL测试集
+        ↓
+获得prompt和expected
+        ↓
+调用大模型获得actual
+        ↓
+Day05进行Exact Match评分
+        ↓
+得到True或False评分结果
+```
+
+Day04 负责读取和校验评测数据，Day05 负责比较模型实际回答与标准答案。两个模块组合后，EvalHub 已经具备“读取测试数据并自动评分”的基础能力。
+
+### 今日学习总结
+
+通过 Day05 的学习，我理解了 Exact Match 不只是简单使用 `actual == expected`。
+
+普通模式会先处理大小写、空格和标点等格式差异，适合评测内容相同但书写格式略有区别的模型回答；严格模式会直接比较原始字符串，适合对输出格式有严格要求的任务。
+
+今天还练习了以下完整开发流程：
+
+```text
+创建Issue
+→ 创建功能分支
+→ 编写功能代码
+→ 编写自动化测试
+→ Commit
+→ Push
+→ 创建Pull Request
+→ 合并到main
+```
