@@ -635,3 +635,64 @@ Day04 负责读取和校验评测数据，Day05 负责比较模型实际回答�
 → 创建Pull Request
 → 合并到main
 ```
+---
+
+## Day06：可版本化 JSONL 评测数据集
+
+### 学习目标
+
+Day06 将评测数据从 Python 代码中分离出来，
+使用 JSONL 文件保存测试题目，并实现数据读取和结果保存。
+
+本日完成：
+
+- 创建包含 10 条测试用例的 JSONL 数据集
+- 实现 `load_jsonl()`
+- 实现 `save_results_jsonl()`
+- 支持 UTF-8 中文文本
+- JSON 格式错误能够显示文件名和行号
+- 支持在全新目录和虚拟环境中克隆复现
+
+### 关键文件
+
+```text
+data/eval_dataset.jsonl
+day06/jsonl_io.py
+day06/test_jsonl_io.py
+notes/day06_reproduce.md
+requirements.txt
+```
+
+### 安装依赖
+
+```bash
+python -m pip install -r requirements.txt
+```
+
+### 运行 Day06
+
+```bash
+python day06/jsonl_io.py
+```
+
+### 运行自动测试
+
+```bash
+python -m pytest day06/test_jsonl_io.py -v
+```
+
+### 预期结果
+
+```text
+读取数量：10 条
+保存数量：10 条
+5 passed
+```
+
+评测结果保存在：
+
+```text
+outputs/day06_results.jsonl
+```
+
+项目使用相对路径，不依赖本机绝对路径。
