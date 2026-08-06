@@ -4,6 +4,7 @@
 # Python缓存
 __pycache__/
 *.py[cod]
+.pytest_cache/
 
 # Python虚拟环境
 venv/
@@ -27,3 +28,6 @@ ENV/
 # 操作系统文件
 .DS_Store
 Thumbs.db
+
+# Generated evaluation outputs
+outputs/
