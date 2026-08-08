@@ -696,3 +696,22 @@ outputs/day06_results.jsonl
 ```
 
 项目使用相对路径，不依赖本机绝对路径。
+
+## Day08：Provider抽象与Mock响应
+
+### 今日完成
+
+- 定义统一的 `LLMResponse`
+- 定义抽象接口 `BaseProvider`
+- 实现 `MockProvider`
+- 支持 success、timeout、429、invalid_json 四种行为
+- 实现 `SequenceMockProvider`
+- 业务函数依赖 `BaseProvider`，不依赖具体模型厂商
+- 为Provider编写自动化测试
+- 阅读OpenAI Evals仓库结构并完成阅读卡片
+
+### 今日理解
+
+Provider抽象层把“业务流程”和“具体模型调用”分开。
+以后接入DeepSeek、通义千问或豆包时，
+只需要新增对应Provider，不需要修改上层评测业务代码。
