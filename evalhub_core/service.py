@@ -1,4 +1,5 @@
-from evalhub_core.provider import BaseProvider, LLMResponse
+from evalhub_core.provider import BaseProvider
+from evalhub_core.schemas import LLMRequest, LLMResponse
 
 
 def execute_prompt(
@@ -6,12 +7,43 @@ def execute_prompt(
     prompt: str,
 ) -> LLMResponse:
     """
-    调用统一的Provider接口。
+    Day08使用的业务函数。
 
-    这个函数不关心provider来自哪个厂商，
-    只要求它遵守BaseProvider接口。
+    该函数必须保留，否则Day08测试无法导入。
+    在调用Provider之前，先使用LLMRequest校验输入。
     """
-    if not prompt.strip():
-        raise ValueError("prompt不能为空")
 
-    return provider.generate(prompt)
+    request = LLMRequest(
+        model=provider.__class__.__name__,
+        input=prompt,
+    )
+
+    response = provider.generate(request.input)
+
+    if isinstance(response, LLMResponse):
+        return response
+
+    if isinstance(response, dict):
+        return LLMResponse.model_validate(response)
+
+    raise TypeError(
+        "provider.generate()必须返回LLMResponse或者dict，"
+        f"但实际返回了：{type(response).__name__}"
+    )
+
+
+def run_generation(
+    provider: BaseProvider,
+    request: LLMRequest,
+) -> LLMResponse:
+    """
+    Day09新增的模型版业务函数。
+
+    接收已经通过Pydantic校验的LLMRequest，
+    并复用Day08的execute_prompt函数。
+    """
+
+    return execute_prompt(
+        provider=provider,
+        prompt=request.input,
+    )

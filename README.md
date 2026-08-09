@@ -715,3 +715,45 @@ outputs/day06_results.jsonl
 Provider抽象层把“业务流程”和“具体模型调用”分开。
 以后接入DeepSeek、通义千问或豆包时，
 只需要新增对应Provider，不需要修改上层评测业务代码。
+## Day09：Pydantic数据模型与字段校验
+
+### 今日目标
+
+使用Pydantic为EvalHub建立数据校验层，
+保证错误数据无法进入业务流程。
+
+### 今日完成
+
+- 使用Pydantic定义`LLMRequest`
+- 使用Pydantic定义`LLMResponse`
+- 使用Pydantic定义`TestCase`
+- 使用嵌套模型定义`TokenUsage`
+- 限制`temperature`取值范围为0～2
+- 禁止请求的`input`为空
+- 使用`Literal`限制`error_type`
+- 实现成功响应必须包含非空`content`
+- 实现失败响应允许`content`为空
+- 编写6个错误输入案例
+- 自动生成Pydantic错误记录
+- 编写数据模型自动化测试
+- 对比普通`dict`与Pydantic模型
+- 阅读Pydantic开源仓库中的校验示例
+- 保持Day08 Provider接口向后兼容
+
+### 今日理解
+
+Pydantic负责在数据进入业务逻辑之前，
+检查数据的字段、类型和业务规则。
+
+普通dict只能保存数据，而Pydantic模型可以提供：
+
+- 明确的数据结构
+- 自动类型校验
+- 字段范围限制
+- 嵌套模型
+- 清晰的错误信息
+- 更完善的IDE自动提示
+
+通过统一的`LLMRequest`和`LLMResponse`，
+后续FastAPI接口、Provider、评分器和数据库模块
+都可以使用同一套数据结构。
