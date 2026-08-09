@@ -1,21 +1,7 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional
+from typing import List
 
-
-@dataclass
-class LLMResponse:
-    """统一的大模型返回结果。"""
-
-    content: str
-    latency_ms: float
-    error_type: Optional[str] = None
-    token_usage: Dict[str, int] = field(default_factory=dict)
-
-    @property
-    def success(self) -> bool:
-        """没有错误时，认为本次调用成功。"""
-        return self.error_type is None
+from evalhub_core.schemas import LLMResponse
 
 
 class BaseProvider(ABC):
@@ -23,7 +9,12 @@ class BaseProvider(ABC):
 
     @abstractmethod
     def generate(self, prompt: str) -> LLMResponse:
-        """根据prompt生成模型响应。"""
+        """
+        根据prompt生成模型响应。
+
+        所有Provider都必须返回LLMResponse。
+        """
+
         raise NotImplementedError
 
 
@@ -47,14 +38,16 @@ class MockProvider(BaseProvider):
         self.behavior = behavior
 
     def generate(self, prompt: str) -> LLMResponse:
+        """根据指定行为返回模拟响应。"""
+
         if self.behavior == "success":
             return LLMResponse(
-                content=f"Mock回答：{prompt}",
-                latency_ms=120.0,
+                content=f"Mock response: {prompt}",
+                latency_ms=10,
                 error_type=None,
                 token_usage={
-                    "prompt_tokens": 10,
-                    "completion_tokens": 8,
+                    "prompt_tokens": 8,
+                    "completion_tokens": 10,
                     "total_tokens": 18,
                 },
             )
@@ -62,29 +55,30 @@ class MockProvider(BaseProvider):
         if self.behavior == "timeout":
             return LLMResponse(
                 content="",
-                latency_ms=3000.0,
+                latency_ms=3000,
                 error_type="timeout",
-                token_usage={},
+                token_usage=None,
             )
 
         if self.behavior == "429":
             return LLMResponse(
                 content="",
-                latency_ms=50.0,
+                latency_ms=100,
                 error_type="rate_limit",
-                token_usage={},
+                token_usage=None,
             )
 
-        # invalid_json表示请求本身成功，
-        # 但是模型返回的内容不是合法JSON。
+        # invalid_json表示：
+        # 模型调用本身成功，所以error_type为None；
+        # 但是模型返回的content不是合法JSON。
         return LLMResponse(
-            content="{name: EvalHub, result: success",
-            latency_ms=100.0,
+            content='{"answer": "缺少右括号"',
+            latency_ms=20,
             error_type=None,
             token_usage={
-                "prompt_tokens": 10,
-                "completion_tokens": 6,
-                "total_tokens": 16,
+                "prompt_tokens": 8,
+                "completion_tokens": 10,
+                "total_tokens": 18,
             },
         )
 
@@ -96,23 +90,34 @@ class SequenceMockProvider(BaseProvider):
         if not behaviors:
             raise ValueError("behaviors不能为空")
 
-        unsupported = [
+        unsupported_behaviors = [
             behavior
             for behavior in behaviors
             if behavior not in MockProvider.SUPPORTED_BEHAVIORS
         ]
 
-        if unsupported:
-            raise ValueError(f"存在不支持的行为：{unsupported}")
+        if unsupported_behaviors:
+            raise ValueError(
+                f"存在不支持的行为：{unsupported_behaviors}"
+            )
 
         self.behaviors = behaviors
         self.current_index = 0
 
     def generate(self, prompt: str) -> LLMResponse:
+        """
+        按照behaviors中的顺序返回响应。
+
+        当调用次数超过行为数量后，
+        继续使用最后一个行为。
+        """
+
         if self.current_index >= len(self.behaviors):
             behavior = self.behaviors[-1]
         else:
             behavior = self.behaviors[self.current_index]
             self.current_index += 1
 
-        return MockProvider(behavior=behavior).generate(prompt)
+        provider = MockProvider(behavior=behavior)
+
+        return provider.generate(prompt)
