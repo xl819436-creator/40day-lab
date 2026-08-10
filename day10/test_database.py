@@ -4,11 +4,19 @@ from evalhub_core.database import (
     create_dataset,
     create_evaluation_job,
     create_evaluation_run,
+    delete_dataset,
+    delete_evaluation_job,
+    delete_evaluation_run,
+    get_dataset,
+    get_evaluation_run,
     get_job,
     get_runs_by_job,
     init_database,
     list_table_names,
     update_job_progress,
+    update_dataset,
+    update_evaluation_job,
+    update_evaluation_run,
 )
 
 
@@ -149,3 +157,113 @@ def test_update_job_progress_to_two_of_three(
         f"\n任务进度更新成功："
         f"{job['completed_cases']}/{job['total_cases']}"
     )
+
+
+def test_dataset_crud(tmp_path: Path) -> None:
+    """严格验证datasets表的创建、查询、更新和删除。"""
+    database_path = create_test_database_path(tmp_path)
+    init_database(database_path)
+
+    dataset_id = create_dataset(
+        name="原始数据集",
+        description="修改前",
+        database_path=database_path,
+    )
+    assert get_dataset(dataset_id, database_path)["name"] == "原始数据集"
+
+    update_dataset(
+        dataset_id=dataset_id,
+        name="更新后的数据集",
+        description="修改后",
+        version="v2.0",
+        file_path="data/v2.jsonl",
+        database_path=database_path,
+    )
+    updated = get_dataset(dataset_id, database_path)
+    assert updated is not None
+    assert updated["name"] == "更新后的数据集"
+    assert updated["version"] == "v2.0"
+
+    delete_dataset(dataset_id, database_path)
+    assert get_dataset(dataset_id, database_path) is None
+
+
+def test_evaluation_job_crud(tmp_path: Path) -> None:
+    """严格验证evaluation_jobs表的CRUD和级联删除。"""
+    database_path = create_test_database_path(tmp_path)
+    init_database(database_path)
+    job_id = create_sample_job(database_path)
+    run_id = create_evaluation_run(
+        job_id=job_id,
+        case_name="case_001",
+        prompt="测试",
+        database_path=database_path,
+    )
+
+    update_evaluation_job(
+        job_id=job_id,
+        name="更新后的任务",
+        provider_name="SequenceMockProvider",
+        status="completed",
+        total_cases=3,
+        completed_cases=3,
+        database_path=database_path,
+    )
+    updated = get_job(job_id, database_path)
+    assert updated is not None
+    assert updated["name"] == "更新后的任务"
+    assert updated["completed_cases"] == 3
+
+    delete_evaluation_job(job_id, database_path)
+    assert get_job(job_id, database_path) is None
+    assert get_evaluation_run(run_id, database_path) is None
+
+
+def test_evaluation_run_crud(tmp_path: Path) -> None:
+    """严格验证evaluation_runs表的创建、查询、更新和删除。"""
+    database_path = create_test_database_path(tmp_path)
+    init_database(database_path)
+    job_id = create_sample_job(database_path)
+    run_id = create_evaluation_run(
+        job_id=job_id,
+        case_name="case_001",
+        prompt="原始问题",
+        database_path=database_path,
+    )
+    assert get_evaluation_run(run_id, database_path)["status"] == "pending"
+
+    update_evaluation_run(
+        run_id=run_id,
+        case_name="case_001",
+        prompt="更新后的问题",
+        expected_output="北京",
+        actual_output="北京",
+        status="success",
+        latency_ms=12.5,
+        database_path=database_path,
+    )
+    updated = get_evaluation_run(run_id, database_path)
+    assert updated is not None
+    assert updated["prompt"] == "更新后的问题"
+    assert updated["status"] == "success"
+
+    delete_evaluation_run(run_id, database_path)
+    assert get_evaluation_run(run_id, database_path) is None
+
+
+def test_progress_cannot_exceed_total(tmp_path: Path) -> None:
+    """防止出现已完成数量大于总数量的无效进度。"""
+    database_path = create_test_database_path(tmp_path)
+    init_database(database_path)
+    job_id = create_sample_job(database_path)
+
+    try:
+        update_job_progress(
+            job_id=job_id,
+            completed_cases=4,
+            database_path=database_path,
+        )
+    except ValueError as error:
+        assert "total_cases" in str(error)
+    else:
+        raise AssertionError("超过总数的进度必须被拒绝。")

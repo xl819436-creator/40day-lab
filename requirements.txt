@@ -1,5 +1,2 @@
-fastapi
-uvicorn
 pydantic>=2,<3
 pytest
-pytest-asyncio
