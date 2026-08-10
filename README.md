@@ -757,3 +757,39 @@ Pydantic负责在数据进入业务逻辑之前，
 通过统一的`LLMRequest`和`LLMResponse`，
 后续FastAPI接口、Provider、评分器和数据库模块
 都可以使用同一套数据结构。
+
+## Day10：SQL、SQLite与EvalHub数据库
+
+### 今日目标
+
+在现有EvalHub核心模块中增加SQLite持久化能力，保存数据集、
+评测任务和单条运行结果。
+
+### 今日完成
+
+- 新增 `evalhub_core/database.py`
+- 创建 `datasets` 数据表
+- 创建 `evaluation_jobs` 数据表
+- 创建 `evaluation_runs` 数据表
+- 实现数据库插入、查询和更新
+- 验证一个job对应3个run的一对多关系
+- 验证任务进度可以更新为2/3
+- 新增3个数据库自动化测试
+- 编写五张核心表的ER图
+- 完成Day 1—10学习复盘
+
+### 今日理解
+
+Pydantic负责进入业务层之前的数据校验，SQLite负责数据的持久化保存。
+
+数据库事务遵循：
+
+- 操作全部成功时执行 `commit`
+- 操作中途失败时执行 `rollback`
+
+### 运行方法
+
+初始化正式数据库：
+
+```bash
+python -m evalhub_core.database

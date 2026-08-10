@@ -31,3 +31,8 @@ Thumbs.db
 
 # Generated evaluation outputs
 outputs/
+
+# SQLite
+*.db
+*.sqlite
+*.sqlite3
