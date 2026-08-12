@@ -65,13 +65,19 @@ def init_database(
                 name TEXT NOT NULL,
                 provider_name TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
-                total_cases INTEGER NOT NULL DEFAULT 0,
-                completed_cases INTEGER NOT NULL DEFAULT 0,
+                total_cases INTEGER NOT NULL DEFAULT 0
+                    CHECK (total_cases >= 0),
+                completed_cases INTEGER NOT NULL DEFAULT 0
+                    CHECK (
+                        completed_cases >= 0
+                        AND completed_cases <= total_cases
+                    ),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                 FOREIGN KEY (dataset_id)
                     REFERENCES datasets(id)
+                    ON DELETE RESTRICT
             )
             """
         )
@@ -86,7 +92,9 @@ def init_database(
                 expected_output TEXT,
                 actual_output TEXT,
                 status TEXT NOT NULL DEFAULT 'pending',
-                latency_ms REAL,
+                latency_ms REAL CHECK (
+                    latency_ms IS NULL OR latency_ms >= 0
+                ),
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
                 FOREIGN KEY (job_id)
@@ -154,6 +162,99 @@ def create_dataset(
         connection.close()
 
 
+def get_dataset(
+    dataset_id: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> Optional[Dict[str, Any]]:
+    """根据ID查询一条数据集记录。"""
+    connection = get_connection(database_path)
+
+    try:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                name,
+                description,
+                version,
+                file_path,
+                created_at
+            FROM datasets
+            WHERE id = ?
+            """,
+            (dataset_id,),
+        ).fetchone()
+
+        return dict(row) if row is not None else None
+
+    finally:
+        connection.close()
+
+
+def update_dataset(
+    dataset_id: int,
+    name: str,
+    description: str,
+    version: str,
+    file_path: Optional[str],
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """完整更新一条数据集记录。"""
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE datasets
+            SET
+                name = ?,
+                description = ?,
+                version = ?,
+                file_path = ?
+            WHERE id = ?
+            """,
+            (name, description, version, file_path, dataset_id),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到dataset_id={dataset_id}的数据集。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def delete_dataset(
+    dataset_id: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """删除没有被评测任务引用的数据集。"""
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            "DELETE FROM datasets WHERE id = ?",
+            (dataset_id,),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到dataset_id={dataset_id}的数据集。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 def create_evaluation_job(
     dataset_id: int,
     name: str,
@@ -163,6 +264,9 @@ def create_evaluation_job(
     database_path: DatabasePath = DEFAULT_DATABASE_PATH,
 ) -> int:
     """创建评测任务，并返回任务ID。"""
+    if total_cases < 0:
+        raise ValueError("total_cases不能小于0。")
+
     connection = get_connection(database_path)
 
     try:
@@ -303,6 +407,88 @@ def get_job(
         connection.close()
 
 
+def update_evaluation_job(
+    job_id: int,
+    name: str,
+    provider_name: str,
+    status: str,
+    total_cases: int,
+    completed_cases: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """完整更新一条评测任务记录。"""
+    if total_cases < 0:
+        raise ValueError("total_cases不能小于0。")
+
+    if completed_cases < 0 or completed_cases > total_cases:
+        raise ValueError(
+            "completed_cases必须在0和total_cases之间。"
+        )
+
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE evaluation_jobs
+            SET
+                name = ?,
+                provider_name = ?,
+                status = ?,
+                total_cases = ?,
+                completed_cases = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            """,
+            (
+                name,
+                provider_name,
+                status,
+                total_cases,
+                completed_cases,
+                job_id,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到job_id={job_id}的评测任务。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def delete_evaluation_job(
+    job_id: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """删除评测任务；关联的run由外键级联删除。"""
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            "DELETE FROM evaluation_jobs WHERE id = ?",
+            (job_id,),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到job_id={job_id}的评测任务。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 def get_runs_by_job(
     job_id: int,
     database_path: DatabasePath = DEFAULT_DATABASE_PATH,
@@ -340,6 +526,117 @@ def get_runs_by_job(
         connection.close()
 
 
+def get_evaluation_run(
+    run_id: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> Optional[Dict[str, Any]]:
+    """根据ID查询一条运行记录。"""
+    connection = get_connection(database_path)
+
+    try:
+        row = connection.execute(
+            """
+            SELECT
+                id,
+                job_id,
+                case_name,
+                prompt,
+                expected_output,
+                actual_output,
+                status,
+                latency_ms,
+                created_at
+            FROM evaluation_runs
+            WHERE id = ?
+            """,
+            (run_id,),
+        ).fetchone()
+
+        return dict(row) if row is not None else None
+
+    finally:
+        connection.close()
+
+
+def update_evaluation_run(
+    run_id: int,
+    case_name: str,
+    prompt: str,
+    expected_output: Optional[str],
+    actual_output: Optional[str],
+    status: str,
+    latency_ms: Optional[float],
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """完整更新一条运行记录。"""
+    if latency_ms is not None and latency_ms < 0:
+        raise ValueError("latency_ms不能小于0。")
+
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            """
+            UPDATE evaluation_runs
+            SET
+                case_name = ?,
+                prompt = ?,
+                expected_output = ?,
+                actual_output = ?,
+                status = ?,
+                latency_ms = ?
+            WHERE id = ?
+            """,
+            (
+                case_name,
+                prompt,
+                expected_output,
+                actual_output,
+                status,
+                latency_ms,
+                run_id,
+            ),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到run_id={run_id}的运行记录。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
+def delete_evaluation_run(
+    run_id: int,
+    database_path: DatabasePath = DEFAULT_DATABASE_PATH,
+) -> None:
+    """删除一条运行记录。"""
+    connection = get_connection(database_path)
+
+    try:
+        cursor = connection.execute(
+            "DELETE FROM evaluation_runs WHERE id = ?",
+            (run_id,),
+        )
+
+        if cursor.rowcount == 0:
+            raise ValueError(f"没有找到run_id={run_id}的运行记录。")
+
+        connection.commit()
+
+    except (sqlite3.Error, ValueError):
+        connection.rollback()
+        raise
+
+    finally:
+        connection.close()
+
+
 def update_job_progress(
     job_id: int,
     completed_cases: int,
@@ -347,12 +644,22 @@ def update_job_progress(
     database_path: DatabasePath = DEFAULT_DATABASE_PATH,
 ) -> None:
     """更新评测任务进度和任务状态。"""
-    if completed_cases < 0:
-        raise ValueError("completed_cases不能小于0。")
-
     connection = get_connection(database_path)
 
     try:
+        job_row = connection.execute(
+            "SELECT total_cases FROM evaluation_jobs WHERE id = ?",
+            (job_id,),
+        ).fetchone()
+
+        if job_row is None:
+            raise ValueError(f"没有找到job_id={job_id}的评测任务。")
+
+        if completed_cases < 0 or completed_cases > job_row["total_cases"]:
+            raise ValueError(
+                "completed_cases必须在0和total_cases之间。"
+            )
+
         cursor = connection.cursor()
 
         cursor.execute(
